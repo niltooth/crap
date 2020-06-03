@@ -1,0 +1,7 @@
+port: 162
+users:
+  - user: opsviewv3
+    auth-alg: SHA
+    auth-passwd: mySecureAuthPassword
+    priv-alg: AES
+    priv-passwd: mySecurePrivPassword

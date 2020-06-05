@@ -1,0 +1,17 @@
+port: 162
+db: postgres://postgres:@localhost:5432/trapdb?sslmode=disable
+stats-interval: 10s
+users:
+  - user: someUsername
+    auth-alg: SHA
+    auth-passwd: mySecureAuthPassword
+    priv-alg: AES
+    priv-passwd: mySecurePrivPassword
+buffer:
+    workers: 4
+    max-time: 15s
+    tables:
+      - table: traps
+        columns: 
+          - time
+          - trap

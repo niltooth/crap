@@ -1,6 +1,10 @@
 package main
 
-import "time"
+import (
+	"time"
+
+	"github.com/dev-mull/pgbuffer"
+)
 
 type Trap struct {
 	Time      time.Time              `json:"time"`
@@ -15,8 +19,11 @@ type Trap struct {
 }
 
 type Config struct {
-	Port  int    `yaml:"port"`
-	Users []User `yaml:"users"`
+	Port          int              `yaml:"port"`
+	Users         []User           `yaml:"users"`
+	DB            string           `yaml:"db"`
+	Buffer        *pgbuffer.Config `yaml:"buffer"`
+	StatsInterval time.Duration    `yaml:"stats-interval"`
 }
 type User struct {
 	User       string `yaml:"user"`

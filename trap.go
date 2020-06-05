@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	//g "github.com/soniah/gosnmp"
@@ -17,11 +17,13 @@ type snmpHandler struct{}
 
 func (h snmpHandler) OnError(addr net.Addr, err error) {
 
+	atomic.AddInt64(&drops, 1)
 	log.Println(addr.String(), err)
 
 }
 
 func (h snmpHandler) OnTrap(addr net.Addr, trap snmplib.Trap) {
+	atomic.AddInt64(&received, 1)
 	t := Trap{
 		Time:      time.Now(),
 		VarBinds:  trap.VarBinds,
@@ -46,8 +48,9 @@ func (h snmpHandler) OnTrap(addr net.Addr, trap snmplib.Trap) {
 
 	}
 
-	prettyPrint, _ := json.MarshalIndent(t, "", "\t")
+	b, _ := json.Marshal(t)
+	log.Debugf("got a trap! %v", string(b))
 
-	log.Println(string(prettyPrint))
+	buff.Write("traps", t.Time.Format(time.RFC3339), string(b))
 
 }

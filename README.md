@@ -1,5 +1,5 @@
 # ItsATrap!
-A high performance snmp trap reciver. Traps are converted into json and stored as jsonb in PostgreSQL. If you enable TimescaleDB in PostgreSQL will you have a highly scalable timeseries database with the full power of PostgreSQL at your hands. That includes full json support, joins, etc.
+A high performance snmp trap receiver. Traps are converted into json and stored as jsonb in PostgreSQL. If you enable TimescaleDB in PostgreSQL will you have a highly scalable timeseries database with the full power of PostgreSQL at your hands. That includes full json support, joins, etc.
 
 ## Performance
 On my limited home hardware I was able to process 20k traps per second. 

@@ -1,6 +1,10 @@
 port: 162
 db: postgres://postgres:@localhost:5432/trapdb?sslmode=disable
 stats-interval: 10s
+stats-subject: stats.test
+mode: hybrid
+nats: nats://127.0.0.1:4222
+subject: test
 users:
   - user: someUsername
     auth-alg: SHA

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"github.com/dev-mull/pgbuffer"
 	"net"
 	"strconv"
 	"strings"
@@ -13,16 +13,19 @@ import (
 	//log "github.com/sirupsen/logrus"
 )
 
-type snmpHandler struct{}
+type snmpHandler struct {
+	buffer      *pgbuffer.Buffer
+	destination chan *Trap
+}
 
-func (h snmpHandler) OnError(addr net.Addr, err error) {
+func (h *snmpHandler) OnError(addr net.Addr, err error) {
 
 	atomic.AddInt64(&drops, 1)
 	log.Println(addr.String(), err)
 
 }
 
-func (h snmpHandler) OnTrap(addr net.Addr, trap snmplib.Trap) {
+func (h *snmpHandler) OnTrap(addr net.Addr, trap snmplib.Trap) {
 	atomic.AddInt64(&received, 1)
 	t := Trap{
 		Time:      time.Now(),
@@ -47,10 +50,5 @@ func (h snmpHandler) OnTrap(addr net.Addr, trap snmplib.Trap) {
 		t.VarBinds[".1.3.6.1.6.3.1.1.4.1.0"] = t.TrapOid
 
 	}
-
-	b, _ := json.Marshal(t)
-	log.Debugf("got a trap! %v", string(b))
-
-	buff.Write("traps", t.Time.Format(time.RFC3339), string(b))
-
+	h.destination <- &t
 }

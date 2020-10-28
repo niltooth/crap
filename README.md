@@ -1,19 +1,23 @@
 # ItsATrap!
-A high performance snmp trap receiver. Traps are converted into json and stored as jsonb in PostgreSQL. If you enable TimescaleDB in PostgreSQL will you have a highly scalable timeseries database with the full power of PostgreSQL at your hands. That includes full json support, joins, etc.
+A high performance snmp trap receiver. Traps are converted into json and stored as jsonb in PostgreSQL. 
+If you enable extensions like TimescaleDB/Citus or run Distributed SQL like Yugabyte, Aurora or Cockroach will you have a highly scalable timeseries database that can co-exist with your other data in the same cluster. 
+This includes full json support with joins, indexing, etc.
 
+## Features
+- Encode snmp traps (v1,v2 & v3) into JSON
+- Bulk load traps into any postgresql client compatible database (postgresql, cochroachdb, yugabyte, etc)
+- Uses COPY instead of insert for better performance
+- Publish traps to nats cluster for "fan out" or load balancing.
+- 3 modes. 
+    - db-only: write traps only to the db
+    - nats-only: write traps only to a nats subject
+    - hybrid: write traps to both nats and the db
 ## Performance
-On my limited home hardware I was able to process 20k traps per second. 
-Data is written to an in memory buffer to allow for bulk sql inserts via COPY. Testing on the lan I have been able to flush 400k traps to the db in about 3 seconds. This could probably be further optimized by using binary copy.
+On my limited home hardware I was able to process roughly 50k traps per second. 
+Data is written to an in memory buffer to allow for bulk sql inserts via COPY. Testing on the lan I have been able to flush about 1 million traps to the db in about 1 second. This could probably be further optimized by using binary copy.
+
 ## TODO
-
-- Add option to throw all messages through nats. this will allow multiple receivers.
- 
- `1. trap -> 2. encode to json -> 3. throw to nats <- 4. receive from nats -> 5. buffer -> 6. flush to db`
- 
- The process should be able to run in 3 modes.
-	1. Trap to buffer to db. (all in one without nats)
-        2. Trap to nats (a single process)
-        3. From nats to buffer to db (a single process)
-  	2 & 3 would do the work of 1 with nats in the middle
-
-- Add index option
+- Create generic stand alone app that takes raw json messages from nats and writes them to a db using the pgbuffer package.
+- Code cleanup and documentation.
+- Test performance on databases other than vanilla PostgreSQL.
+- If additional outputs are needed, move to a plugin based design.

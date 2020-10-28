@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -14,11 +15,13 @@ import (
 var drops, sent int64
 var total, cores, count int
 var constant bool
+var host string
 
 func init() {
 	flag.IntVar(&total, "total", 50000, "total number of traps to send")
 	flag.IntVar(&cores, "workers", runtime.NumCPU(), "number of worker routines")
 	flag.BoolVar(&constant, "constant", false, "don't stop sending")
+	flag.StringVar(&host, "host", "127.0.0.1", "ip/hostname of the trap receiver")
 }
 
 func main() {
@@ -43,22 +46,8 @@ func main() {
 }
 func work(wg *sync.WaitGroup) {
 	defer wg.Done()
-	if !constant {
-
-		for i := 0; i < count; i++ {
-			sendTrap()
-		}
-	} else {
-		for {
-			sendTrap()
-		}
-	}
-
-}
-
-func sendTrap() error {
 	snmp := &g.GoSNMP{
-		Target:  "127.0.0.1",
+		Target:  host,
 		Port:    162,
 		Version: g.Version1,
 		Timeout: time.Second * 5,
@@ -66,10 +55,24 @@ func sendTrap() error {
 	}
 	err := snmp.Connect()
 	if err != nil {
-		atomic.AddInt64(&drops, 1)
-		return err
+		log.Fatal(err)
 	}
 	defer snmp.Conn.Close()
+
+	if !constant {
+
+		for i := 0; i < count; i++ {
+			sendTrap(snmp)
+		}
+	} else {
+		for {
+			sendTrap(snmp)
+		}
+	}
+
+}
+
+func sendTrap(snmp *g.GoSNMP) error {
 
 	pdu := g.SnmpPDU{
 		Name:  "1.3.6.1.2.1.1.6",
@@ -86,7 +89,7 @@ func sendTrap() error {
 		Timestamp:    300,
 	}
 
-	_, err = snmp.SendTrap(trap)
+	_, err := snmp.SendTrap(trap)
 
 	if err != nil {
 		atomic.AddInt64(&drops, 1)

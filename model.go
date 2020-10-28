@@ -17,6 +17,12 @@ type Trap struct {
 	TrapOid   string                 `json:"trap_oid"`
 	VarBinds  map[string]interface{} `json:"var_binds"`
 }
+type Stat struct {
+	Time     time.Time `json:"time"`
+	Hostname string    `json:"hostname"`
+	Count    int64     `json:"count"`
+	Drops    int64     `json:"drops"`
+}
 
 type Config struct {
 	Port          int              `yaml:"port"`
@@ -24,6 +30,10 @@ type Config struct {
 	DB            string           `yaml:"db"`
 	Buffer        *pgbuffer.Config `yaml:"buffer"`
 	StatsInterval time.Duration    `yaml:"stats-interval"`
+	Nats          string           `yaml:"nats-url"`
+	Subject       string           `yaml:"subject"`
+	StatsSubject  string           `yaml:"stats-subject"`
+	Mode          string           `yaml:"mode"`
 }
 type User struct {
 	User       string `yaml:"user"`

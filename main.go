@@ -102,10 +102,10 @@ func RunServer(cfg *Config, ch chan *Trap, stop chan bool) error {
 	if cfg.Mode == "hybrid" || cfg.Mode == "db-only" {
 		db, err = sql.Open("postgres", cfg.DB)
 		if err != nil {
-			return err
+			log.Fatal(err)
 		}
 		if err := db.Ping(); err != nil {
-			return err
+			log.Fatal(err)
 		}
 		buff = pgbuffer.NewBuffer(db, cfg.Buffer, log)
 		defer db.Close()
@@ -114,7 +114,7 @@ func RunServer(cfg *Config, ch chan *Trap, stop chan bool) error {
 	if cfg.Mode == "hybrid" || cfg.Mode == "nats-only" {
 		conn, err = nats.Connect(cfg.Nats)
 		if err != nil {
-			return err
+			log.Fatal(err)
 		}
 		defer conn.Close()
 	}

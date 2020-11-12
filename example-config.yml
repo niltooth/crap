@@ -13,7 +13,7 @@ users:
     priv-passwd: mySecurePrivPassword
 buffer:
     workers: 4
-    max-time: 15s
+    limit: 10000
     tables:
       - table: traps
         columns: 

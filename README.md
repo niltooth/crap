@@ -17,7 +17,6 @@ On my limited home hardware I was able to process roughly 50k traps per second.
 Data is written to an in memory buffer to allow for bulk sql inserts via COPY. Testing on the lan I have been able to flush about 1 million traps to the db in about 1 second. This could probably be further optimized by using binary copy.
 
 ## TODO
-- Create generic stand alone app that takes raw json messages from nats and writes them to a db using the pgbuffer package.
 - Code cleanup and documentation.
 - Test performance on databases other than vanilla PostgreSQL.
 - If additional outputs are needed, move to a plugin based design.

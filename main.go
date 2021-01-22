@@ -107,8 +107,13 @@ func RunServer(cfg *Config, ch chan *Trap, stop chan bool) error {
 		if err := db.Ping(); err != nil {
 			log.Fatal(err)
 		}
-		buff = pgbuffer.NewBuffer(db, cfg.Buffer, log)
 		defer db.Close()
+		cfg.Buffer.Logger = log
+		buff,err = pgbuffer.NewBuffer(db, cfg.Buffer)
+
+		if err != nil {
+			log.Fatal(err)
+		}
 		go buff.Run()
 	}
 	if cfg.Mode == "hybrid" || cfg.Mode == "nats-only" {

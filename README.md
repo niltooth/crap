@@ -3,6 +3,7 @@ A high performance snmp trap receiver. Traps are converted into json and stored 
 If you enable extensions like TimescaleDB/Citus or run Distributed SQL like Yugabyte, Aurora or Cockroach will you have a highly scalable timeseries database that can co-exist with your other data in the same cluster. 
 This includes full json support with joins, indexing, etc.
 
+
 ## Features
 - Encode snmp traps (v1,v2 & v3) into JSON
 - Bulk load traps into any postgresql client compatible database (postgresql, cochroachdb, yugabyte, etc)

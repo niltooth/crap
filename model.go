@@ -2,8 +2,6 @@ package main
 
 import (
 	"time"
-
-	"github.com/dev-mull/pgbuffer"
 )
 
 type Trap struct {
@@ -25,16 +23,21 @@ type Stat struct {
 }
 
 type Config struct {
-	Port          int              `yaml:"port"`
-	Users         []User           `yaml:"users"`
-	DB            string           `yaml:"db"`
-	Buffer        *pgbuffer.Config `yaml:"buffer"`
-	StatsInterval time.Duration    `yaml:"stats-interval"`
-	Nats          string           `yaml:"nats-url"`
-	Subject       string           `yaml:"subject"`
-	StatsSubject  string           `yaml:"stats-subject"`
-	Mode          string           `yaml:"mode"`
+	Address string `yaml:"address"`
+	Port    int    `yaml:"port"`
+	Users   []User `yaml:"users"`
+	Nats    struct {
+		Url       string `yaml:"url"`
+		CredsFile string `yaml:"creds-file"`
+		Subject   string `yaml:"subject"`
+		RootCa    string `yaml:"root-ca"`
+	} `yaml:"nats"`
+	Stats struct {
+		Subject  string        `yaml:"subject"`
+		Interval time.Duration `yaml:"interval"`
+	} `yaml:"stats"`
 }
+
 type User struct {
 	User       string `yaml:"user"`
 	AuthAlg    string `yaml:"auth-alg"`

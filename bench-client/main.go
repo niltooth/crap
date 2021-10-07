@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,7 +15,7 @@ import (
 )
 
 var drops, sent int64
-var total, cores, count int
+var total, cores int
 var constant bool
 var host string
 
@@ -30,21 +32,21 @@ func main() {
 
 	// Default is a pointer to a GoSNMP struct that contains sensible defaults
 
-	// eg port 161, community public, etc
+	count := total / cores
 	var wg sync.WaitGroup
-	count = total / cores
+
 	fmt.Printf("constant: %v, workers %v, count %v, total %v\n", constant, cores, count, total)
 	for i := 0; i < cores; i++ {
 		wg.Add(1)
-		work(&wg)
+		work(count, &wg)
 	}
 	wg.Wait()
 	dur := time.Since(st)
 	tps := float64(total) / dur.Seconds()
-	fmt.Printf("sent %v traps in %v %v tps drops: %v\n", sent, dur, tps, drops)
+	fmt.Printf("sent %v traps in %v %.2f tps, drops: %v\n", sent, dur, tps, drops)
 
 }
-func work(wg *sync.WaitGroup) {
+func work(count int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	snmp := &g.GoSNMP{
 		Target:  host,
@@ -60,7 +62,6 @@ func work(wg *sync.WaitGroup) {
 	defer snmp.Conn.Close()
 
 	if !constant {
-
 		for i := 0; i < count; i++ {
 			sendTrap(snmp)
 		}
@@ -74,14 +75,24 @@ func work(wg *sync.WaitGroup) {
 
 func sendTrap(snmp *g.GoSNMP) error {
 
-	pdu := g.SnmpPDU{
-		Name:  "1.3.6.1.2.1.1.6",
-		Type:  g.OctetString,
-		Value: "Your mom",
+	r := 1
+	//add some randomnesssssss
+	if n := rand.Intn(10); n > 1 {
+		r = n
+	}
+	pdus := make([]g.SnmpPDU, r)
+
+	for i := 0; i < r; i++ {
+		pdu := g.SnmpPDU{
+			Name:  ".1.3.6.1.2.1.1.6." + strconv.Itoa(i),
+			Type:  g.OctetString,
+			Value: "Your mom",
+		}
+		pdus[i] = pdu
 	}
 
 	trap := g.SnmpTrap{
-		Variables:    []g.SnmpPDU{pdu},
+		Variables:    pdus,
 		Enterprise:   ".1.3.6.1.6.3.1.1.5.1",
 		AgentAddress: "127.0.0.1",
 		GenericTrap:  0,
@@ -93,6 +104,7 @@ func sendTrap(snmp *g.GoSNMP) error {
 
 	if err != nil {
 		atomic.AddInt64(&drops, 1)
+		fmt.Println(err)
 		return err
 	}
 	atomic.AddInt64(&sent, 1)

@@ -1,21 +1,14 @@
 port: 162
-db: postgres://postgres:@localhost:5432/trapdb?sslmode=disable
-stats-interval: 10s
-stats-subject: stats.test
-mode: hybrid
-nats: nats://127.0.0.1:4222
-subject: test
+stats:
+  subject: stats.test
+  interval: 10s
+nats: 
+  url: nats://127.0.0.1:4222
+  subject: itsa.trap
+  creds-file: ""
 users:
   - user: someUsername
     auth-alg: SHA
     auth-passwd: mySecureAuthPassword
     priv-alg: AES
     priv-passwd: mySecurePrivPassword
-buffer:
-    workers: 4
-    limit: 10000
-    tables:
-      - table: traps
-        columns: 
-          - time
-          - trap

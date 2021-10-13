@@ -11,8 +11,6 @@ import (
 
 var configPath, logLevel string
 var received, drops int64
-var hostname string
-var err error
 
 func init() {
 	flag.StringVar(&configPath, "config", "./config.yml", "path to config file")

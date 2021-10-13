@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "./pb";
+
+message Trap {
+  google.protobuf.Timestamp time = 1;
+  google.protobuf.Struct var_binds = 2;
+  string address = 3;
+  int32 version = 4;
+  int32 trap_type = 5;
+  string community = 6;
+  string user = 7;
+  string trap_oid = 8;
+}
+
+message Stat {
+  google.protobuf.Timestamp time = 1;
+  string hostname = 2;
+  int64 drops = 3;
+  int64 count = 4;
+}

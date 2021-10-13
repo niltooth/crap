@@ -2,13 +2,19 @@ package main
 
 import (
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/deejross/go-snmplib"
+	"github.com/dev-mull/crap/pb"
 	"github.com/nats-io/nats.go"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func NewTrapServer(cfg *Config, nc *nats.Conn, subject string) (*snmplib.TrapServer, *Handler, error) {
@@ -27,56 +33,101 @@ func NewTrapServer(cfg *Config, nc *nats.Conn, subject string) (*snmplib.TrapSer
 		server.Users = append(server.Users, user)
 	}
 
-	return &server, NewHandler(nc, subject), nil
+	h, err := NewHandler(nc, cfg)
+	return &server, h, err
 }
 
 type Handler struct {
-	c       *nats.EncodedConn
-	subject string
+	c   *nats.Conn
+	js  nats.JetStreamContext
+	cfg *Config
 }
 
-func NewHandler(nc *nats.Conn, subject string) *Handler {
-	enc, _ := nats.NewEncodedConn(nc, nats.JSON_ENCODER)
-	return &Handler{
-		enc, subject,
+func NewHandler(nc *nats.Conn, cfg *Config) (*Handler, error) {
+	h := &Handler{
+		c:   nc,
+		cfg: cfg,
 	}
+	if cfg.Nats.Jetstream {
+		var err error
+		if h.js, err = nc.JetStream(); err != nil {
+			return nil, err
+		}
+	}
+	return h, nil
 }
 
 //I'm not sure on the use of this oid to represent the trap oid...
 const trapOid = ".1.3.6.1.6.3.1.1.4.1.0"
 
-//TODO: Convert to use optional protobuf... probably need to bring in parts of the snmp lib..
 //TODO: add optional jetstream context..
 //IDEA: optional subject based on trapoid
 func (h *Handler) OnTrap(addr net.Addr, trap snmplib.Trap) {
 	go func(addr net.Addr, trap snmplib.Trap) {
 		atomic.AddInt64(&received, 1)
 
-		t := Trap{
-			Time:      time.Now(),
-			VarBinds:  trap.VarBinds,
+		//gotta do a little funny stuff here.
+		//probably should write my own protobuf capable snmp lib
+		vb := make(map[string]interface{})
+		for k, v := range trap.VarBinds {
+			var nv interface{}
+			switch v.(type) {
+			case snmplib.Oid:
+				nv = v.(snmplib.Oid).String()
+			case time.Duration:
+				nv = v.(time.Duration).String()
+			default:
+				nv = v
+			}
+			vb[k] = nv
+		}
+		nvb, err := structpb.NewStruct(vb)
+		if err != nil {
+			atomic.AddInt64(&drops, 1)
+			return
+		}
+		tt := &pb.Trap{
+			Time:      timestamppb.Now(),
 			Address:   trap.Address,
-			Version:   trap.Version,
-			TrapType:  trap.TrapType,
+			Version:   int32(trap.Version),
+			TrapType:  int32(trap.TrapType),
 			Community: trap.Community,
-			Username:  trap.Username,
+			User:      trap.Username,
+			VarBinds:  nvb,
 		}
 
-		if o, ok := t.VarBinds[trapOid].(snmplib.Oid); ok {
+		if o, ok := trap.VarBinds[trapOid].(snmplib.Oid); ok {
 			s := make([]string, len(o))
 			for i, v := range o {
 				s[i] = strconv.Itoa(v)
 			}
-			t.TrapOid = "." + strings.Join(s, ".")
-			t.VarBinds[trapOid] = t.TrapOid
+			tt.TrapOid = "." + strings.Join(s, ".")
 
 		} else if s := trap.OID.String(); s != "" && s != "." {
-			t.TrapOid = s
-			t.VarBinds[trapOid] = t.TrapOid
+			tt.TrapOid = s
 		}
 
-		h.c.Publish(h.subject, t)
+		sub := h.cfg.Nats.Subject + "." +
+			strings.ReplaceAll(trap.Community, ".", "_") + "." +
+			strings.ReplaceAll(tt.TrapOid, ".", "-")
+
+		h.Publish(sub, tt)
 	}(addr, trap)
+}
+
+func (h *Handler) Publish(subject string, m proto.Message) error {
+	var b []byte
+	var err error
+	switch h.cfg.Encoding {
+	case "json":
+		b, err = protojson.MarshalOptions{UseProtoNames: true}.Marshal(m)
+	default:
+		b, err = proto.Marshal(m)
+	}
+	if err != nil {
+		return err
+	}
+	return h.c.Publish(subject, b)
 }
 
 func (h *Handler) OnError(addr net.Addr, err error) {
@@ -85,19 +136,20 @@ func (h *Handler) OnError(addr net.Addr, err error) {
 
 func (h *Handler) StartStats(cfg *Config) {
 	if cfg.Stats.Interval != 0 {
+		hostname, _ := os.Hostname() // good enough
 		t := time.NewTicker(cfg.Stats.Interval)
 		for {
 			select {
 			case <-t.C:
 				count := atomic.LoadInt64(&received)
 				dropCount := atomic.LoadInt64(&drops)
-				s := Stat{
-					Time:     time.Now(),
+				s := &pb.Stat{
+					Time:     timestamppb.Now(),
 					Hostname: hostname,
 					Drops:    dropCount,
 					Count:    count,
 				}
-				h.c.Publish(cfg.Stats.Subject, s)
+				h.Publish(cfg.Stats.Subject, s)
 			}
 
 		}

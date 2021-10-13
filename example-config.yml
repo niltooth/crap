@@ -1,5 +1,5 @@
 port: 162
-encoding: json
+  #encoding: json
 stats:
   subject: stats.test
   interval: 10s

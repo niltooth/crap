@@ -11,13 +11,15 @@ import (
 	"github.com/deejross/go-snmplib"
 	"github.com/dev-mull/crap/pb"
 	"github.com/nats-io/nats.go"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func NewTrapServer(cfg *Config, nc *nats.Conn, subject string) (*snmplib.TrapServer, *Handler, error) {
+func NewTrapServer(cfg *Config, nc *nats.Conn, logger *zap.Logger) (*snmplib.TrapServer,
+	*Handler, error) {
 	server, err := snmplib.NewTrapServer(cfg.Address, cfg.Port)
 	if err != nil {
 		return nil, nil, err
@@ -33,20 +35,22 @@ func NewTrapServer(cfg *Config, nc *nats.Conn, subject string) (*snmplib.TrapSer
 		server.Users = append(server.Users, user)
 	}
 
-	h, err := NewHandler(nc, cfg)
+	h, err := NewHandler(nc, cfg, logger)
 	return &server, h, err
 }
 
 type Handler struct {
-	c   *nats.Conn
-	js  nats.JetStreamContext
-	cfg *Config
+	c      *nats.Conn
+	js     nats.JetStreamContext
+	cfg    *Config
+	logger *zap.Logger
 }
 
-func NewHandler(nc *nats.Conn, cfg *Config) (*Handler, error) {
+func NewHandler(nc *nats.Conn, cfg *Config, logger *zap.Logger) (*Handler, error) {
 	h := &Handler{
-		c:   nc,
-		cfg: cfg,
+		c:      nc,
+		cfg:    cfg,
+		logger: logger,
 	}
 	if cfg.Nats.Jetstream {
 		var err error
@@ -83,6 +87,7 @@ func (h *Handler) OnTrap(addr net.Addr, trap snmplib.Trap) {
 		}
 		nvb, err := structpb.NewStruct(vb)
 		if err != nil {
+			h.logger.Error("failed to map varbinds", zap.String("error", err.Error()))
 			atomic.AddInt64(&drops, 1)
 			return
 		}
@@ -111,7 +116,13 @@ func (h *Handler) OnTrap(addr net.Addr, trap snmplib.Trap) {
 			strings.ReplaceAll(trap.Community, ".", "_") + "." +
 			strings.ReplaceAll(tt.TrapOid, ".", "-")
 
-		h.Publish(sub, tt)
+		if err := h.Publish(sub, tt); err != nil {
+			h.logger.Error("failed publish",
+				zap.String("error", err.Error()),
+				zap.String("sub", sub),
+			)
+			atomic.AddInt64(&drops, 1)
+		}
 	}(addr, trap)
 }
 
@@ -131,6 +142,10 @@ func (h *Handler) Publish(subject string, m proto.Message) error {
 }
 
 func (h *Handler) OnError(addr net.Addr, err error) {
+	h.logger.Error("failed to handle trap",
+		zap.String("error", err.Error()),
+		zap.String("addr", addr.String()),
+	)
 	atomic.AddInt64(&drops, 1)
 }
 
@@ -141,14 +156,18 @@ func (h *Handler) StartStats(cfg *Config) {
 		for {
 			select {
 			case <-t.C:
-				count := atomic.LoadInt64(&received)
-				dropCount := atomic.LoadInt64(&drops)
 				s := &pb.Stat{
-					Time:     timestamppb.Now(),
-					Hostname: hostname,
-					Drops:    dropCount,
-					Count:    count,
+					Time:       timestamppb.Now(),
+					Hostname:   hostname,
+					Drops:      atomic.LoadInt64(&drops),
+					Received:   atomic.LoadInt64(&received),
+					NatsErrors: atomic.LoadInt64(&natsErrs),
 				}
+				h.logger.Info("stats",
+					zap.Int64("drops", s.Drops),
+					zap.Int64("received", s.Received),
+					zap.Int64("nats-errors", s.NatsErrors),
+				)
 				h.Publish(cfg.Stats.Subject, s)
 			}
 
